@@ -1,0 +1,11 @@
+version: 2
+updates:
+  - package-ecosystem: "npm" # or other package managers like "pip", "maven", etc.
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "deps" # or "security" for security updates
+    labels:
+      - "dependencies" # Default label for all updates
+    security-updates-only: true # If you want to only receive security updates

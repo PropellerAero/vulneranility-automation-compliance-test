@@ -1,0 +1,86 @@
+name: Dependabot to Jira
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  create-jira-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up jq
+        run: sudo apt-get install jq
+
+      - name: Determine PR type
+        id: determine-pr-type
+        run: |
+          PR_URL=$(jq -r '.pull_request.html_url' "$GITHUB_EVENT_PATH")
+          LABELS=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
+          if echo "$LABELS" | grep -q "security"; then
+            echo "::set-output name=pr_type::security"
+          else
+            echo "::set-output name=pr_type::upgrade"
+          fi
+
+      - name: Create Jira issue for security vulnerability
+        if: steps.determine-pr-type.outputs.pr_type == 'security'
+        env:
+          JIRA_HOST: ${{ secrets.JIRA_HOST }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_PROJECT_KEY: ${{ secrets.JIRA_PROJECT_KEY }}
+        run: |
+          PR_TITLE=$(jq -r '.pull_request.title' "$GITHUB_EVENT_PATH")
+          PR_URL=$(jq -r '.pull_request.html_url' "$GITHUB_EVENT_PATH")
+          SUMMARY="Security vulnerability: $PR_TITLE"
+          DESCRIPTION="Dependabot has detected a security vulnerability. Please review the pull request at $PR_URL"
+
+          curl -X POST \
+            --url "https://$JIRA_HOST/rest/api/3/issue" \
+            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{
+              "fields": {
+                "project": {
+                  "key": "'"${JIRA_PROJECT_KEY}"'"
+                },
+                "summary": "'"${SUMMARY}"'",
+                "description": "'"${DESCRIPTION}"'",
+                "issuetype": {
+                  "name": "Bug"
+                }
+              }
+            }'
+
+      - name: Create Jira issue for regular upgrade
+        if: steps.determine-pr-type.outputs.pr_type == 'upgrade'
+        env:
+          JIRA_HOST: ${{ secrets.JIRA_HOST }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_PROJECT_KEY: ${{ secrets.JIRA_PROJECT_KEY }}
+        run: |
+          PR_TITLE=$(jq -r '.pull_request.title' "$GITHUB_EVENT_PATH")
+          PR_URL=$(jq -r '.pull_request.html_url' "$GITHUB_EVENT_PATH")
+          SUMMARY="Dependency update: $PR_TITLE"
+          DESCRIPTION="Dependabot has created a dependency update. Please review the pull request at $PR_URL"
+
+          curl -X POST \
+            --url "https://$JIRA_HOST/rest/api/3/issue" \
+            --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{
+              "fields": {
+                "project": {
+                  "key": "'"${JIRA_PROJECT_KEY}"'"
+                },
+                "summary": "'"${SUMMARY}"'",
+                "description": "'"${DESCRIPTION}"'",
+                "issuetype": {
+                  "name": "Task"
+                }
+              }
+            }'
