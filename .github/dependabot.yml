@@ -5,7 +5,8 @@ updates:
     schedule:
       interval: "daily"
     commit-message:
-      prefix: "deps" # or "security" for security updates
+      prefix: "security" # or "security" for security updates
     labels:
       - "dependencies" # Default label for all updates
     security-updates-only: true # If you want to only receive security updates
+    open-pull-requests-limit: 0
